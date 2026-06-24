@@ -16,6 +16,12 @@ Built with pure bash + osascript. No Python, no dependencies, no Xcode required.
 
 ## Install
 
+### Option 1 — App (easiest)
+1. Go to the [Releases](https://github.com/youbethemoose/did-i-leave-the-oven-on/releases) page and download **Did I Leave the Oven On (App)**
+2. Unzip it and drag the app to your Applications folder
+3. First time only: right-click the app → **Open** (macOS will warn it's from the internet — this is normal for apps distributed outside the App Store)
+
+### Option 2 — Terminal Installer
 1. Download and unzip this repo
 2. Open Terminal, `cd` into the folder, and run:
 
@@ -23,7 +29,7 @@ Built with pure bash + osascript. No Python, no dependencies, no Xcode required.
 bash install.sh
 ```
 
-The app will appear in your `/Applications` folder. Launch it from Spotlight or Finder like any other app.
+The app will appear in your `/Applications` folder with no extra steps needed.
 
 ## Usage
 
