@@ -56,19 +56,19 @@ trap 'rm -f "$ERRFILE"' EXIT
 
 DEST_FOLDER="$DEST/$(basename "$SOURCE")"
 
-osascript -e "display notification \"Starting sync of $TOTAL_FILES files…\" with title \"Did I Leave the Oven On\" subtitle \"$FOLDER_NAME\""
+HALFWAY=$((TOTAL_FILES / 2))
+HALFWAY_NOTIFIED=0
 
 rsync -a --update --modify-window=2 "$SOURCE" "$DEST" 2>"$ERRFILE" &
 RSYNC_PID=$!
 
-LAST_DONE=""
 while kill -0 "$RSYNC_PID" 2>/dev/null; do
     sleep 3
-    if [ -d "$DEST_FOLDER" ]; then
+    if [ "$HALFWAY_NOTIFIED" -eq 0 ] && [ -d "$DEST_FOLDER" ]; then
         DONE=$(find "$DEST_FOLDER" -type f | wc -l | tr -d ' ')
-        if [ "$DONE" != "$LAST_DONE" ]; then
-            osascript -e "display notification \"$DONE of $TOTAL_FILES files synced\" with title \"Did I Leave the Oven On\" subtitle \"Syncing $FOLDER_NAME…\""
-            LAST_DONE="$DONE"
+        if [ "$DONE" -ge "$HALFWAY" ]; then
+            osascript -e "display notification \"Halfway there — still syncing…\" with title \"Did I Leave the Oven On\" subtitle \"$FOLDER_NAME\""
+            HALFWAY_NOTIFIED=1
         fi
     fi
 done
