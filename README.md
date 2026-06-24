@@ -1,50 +1,34 @@
 # Did I Leave the Oven On
 
-A simple Mac app for backing up folders to an external drive — with progress notifications so you actually know it's working.
+A Mac menu bar app for backing up folders to an external drive. Lives quietly in your menu bar — click it to sync, see progress, and know when it's safe to eject.
 
 ## What it does
 
-1. You pick one or more folders to back up and a destination drive
-2. Your choices are saved — next time it's just one click to sync
-3. It syncs new and updated files only — unchanged files are skipped, no double space usage
-4. Prevents your Mac from sleeping while the sync is running
-5. A notification appears at the halfway point so you know it's still running
-6. When done, a persistent alert confirms the sync was 1:1 accurate and tells you it's safe to eject
-
-If your saved destination drive isn't plugged in, it detects that and lets you pick a new one instead of failing silently.
-
-Built with pure bash + osascript. No Python, no dependencies, no Xcode required.
+- Sits in your menu bar — click to sync anytime
+- Back up one or multiple folders to a single destination drive
+- Remembers your folders — one click after first setup
+- Only copies new or changed files, so it's fast and doesn't waste drive space
+- Prevents your Mac from sleeping while syncing
+- Shows live progress in the menu bar dropdown
+- Notifies you at the halfway point and when the sync is verified complete
+- Detects if your destination drive isn't plugged in and lets you pick a new one
 
 ## Install
 
-### Option 1 — App (easiest)
-1. Go to the [Releases](https://github.com/youbethemoose/did-i-leave-the-oven-on/releases) page and download **Did I Leave the Oven On (App)**
-2. Unzip it and drag the app to your Applications folder
-3. First time only: right-click the app → **Open** (macOS will warn it's from the internet — this is normal for apps distributed outside the App Store)
+1. Go to [Releases](https://github.com/youbethemoose/did-i-leave-the-oven-on/releases) and download **Did.I.Leave.the.Oven.On.zip**
+2. Unzip and drag the app to your Applications folder
+3. First time only: right-click the app → **Open** (macOS security prompt for apps distributed outside the App Store)
 
-### Option 2 — Terminal Installer
-1. Download and unzip this repo
-2. Open Terminal, `cd` into the folder, and run:
+## Build from source
+
+Requires Swift command line tools (`xcode-select --install` — no full Xcode needed):
 
 ```bash
-bash install.sh
+git clone https://github.com/youbethemoose/did-i-leave-the-oven-on
+cd did-i-leave-the-oven-on
+bash build.sh
 ```
-
-The app will appear in your `/Applications` folder with no extra steps needed.
-
-## Usage
-
-- **First run:** you'll be prompted to pick a source folder and destination
-- **Every run after:** a single dialog shows your saved folders — hit **Sync** to go, or **Change** to pick different folders
-- **Drive not plugged in:** if the saved destination isn't found, it automatically asks you to pick a new one
-
-Your saved folder preferences are stored at `~/.config/did-i-leave-the-oven-on/config`.
-
-## Update
-
-To install a newer version, just run `bash install.sh` again — it overwrites the existing app.
 
 ## Requirements
 
-- macOS 10.10 or later
-- No additional software needed
+- macOS 12 or later

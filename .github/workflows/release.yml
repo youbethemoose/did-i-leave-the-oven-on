@@ -1,0 +1,36 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build app
+        run: bash build.sh
+
+      - name: Zip app
+        run: zip -r "Did.I.Leave.the.Oven.On.zip" "Did I Leave the Oven On.app"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          files: Did.I.Leave.the.Oven.On.zip
+          body: |
+            ## Install
+
+            1. Download **Did.I.Leave.the.Oven.On.zip** below
+            2. Unzip and drag the app to your Applications folder
+            3. First time only: right-click → **Open** (macOS security prompt for unsigned apps)
+
+            ---
+
+            > To build from source: clone the repo and run `bash build.sh`
