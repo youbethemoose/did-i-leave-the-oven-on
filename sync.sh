@@ -5,44 +5,83 @@
 # Pure osascript — no Python, no tkinter, guaranteed to work
 # ─────────────────────────────────────────────────────
 
-# ── Step 1: Pick SOURCE folder ──
-SOURCE=$(osascript -e 'tell application "Finder"
-    set sourceFolder to choose folder with prompt "Select the folder you want to back up:"
-    return POSIX path of sourceFolder
-end tell' 2>/dev/null)
+CONFIG_DIR="$HOME/.config/did-i-leave-the-oven-on"
+CONFIG_FILE="$CONFIG_DIR/config"
+mkdir -p "$CONFIG_DIR"
 
-if [ -z "$SOURCE" ]; then
-    exit 0
+# ── Load saved folders ──
+SAVED_SOURCE=""
+SAVED_DEST=""
+if [ -f "$CONFIG_FILE" ]; then
+    SAVED_SOURCE=$(grep '^SOURCE=' "$CONFIG_FILE" | cut -d= -f2-)
+    SAVED_DEST=$(grep '^DEST=' "$CONFIG_FILE" | cut -d= -f2-)
 fi
 
-SOURCE="${SOURCE%/}"
-FOLDER_NAME=$(basename "$SOURCE")
+# ── Step 1: Pick folders (or use saved) ──
+if [ -n "$SAVED_SOURCE" ] && [ -n "$SAVED_DEST" ] && [ -d "$SAVED_SOURCE" ]; then
+    SAVED_FOLDER_NAME=$(basename "$SAVED_SOURCE")
 
-# ── Step 2: Pick DESTINATION ──
-DEST=$(osascript -e 'tell application "Finder"
-    set destFolder to choose folder with prompt "Select the destination (where the folder will be placed):"
-    return POSIX path of destFolder
-end tell' 2>/dev/null)
+    # Check if destination is mounted
+    if [ ! -d "$SAVED_DEST" ]; then
+        osascript -e "display notification \"Saved destination not found — please pick a new one\" with title \"Did I Leave the Oven On\""
+        PICK_NEW=1
+    else
+        CHOICE=$(osascript -e "button returned of (display dialog \"Ready to sync:
 
-if [ -z "$DEST" ]; then
-    exit 0
+Folder:      $SAVED_FOLDER_NAME
+Destination: $SAVED_DEST
+
+New and updated files only. Unchanged files skipped.\" buttons {\"Change\", \"Sync\"} default button \"Sync\")" 2>/dev/null)
+
+        if [ "$CHOICE" = "Sync" ]; then
+            SOURCE="$SAVED_SOURCE"
+            DEST="$SAVED_DEST"
+            PICK_NEW=0
+        else
+            PICK_NEW=1
+        fi
+    fi
+else
+    PICK_NEW=1
 fi
 
-DEST="${DEST%/}"
+# ── Pick new folders if needed ──
+if [ "$PICK_NEW" -eq 1 ]; then
+    SOURCE=$(osascript -e 'tell application "Finder"
+        set sourceFolder to choose folder with prompt "Select the folder you want to back up:"
+        return POSIX path of sourceFolder
+    end tell' 2>/dev/null)
 
-# ── Step 3: Confirm ──
-CONFIRM=$(osascript -e "button returned of (display dialog \"Ready to sync:
+    if [ -z "$SOURCE" ]; then exit 0; fi
+    SOURCE="${SOURCE%/}"
+
+    DEST=$(osascript -e 'tell application "Finder"
+        set destFolder to choose folder with prompt "Select the destination (where the folder will be placed):"
+        return POSIX path of destFolder
+    end tell' 2>/dev/null)
+
+    if [ -z "$DEST" ]; then exit 0; fi
+    DEST="${DEST%/}"
+
+    # Save for next time
+    echo "SOURCE=$SOURCE" > "$CONFIG_FILE"
+    echo "DEST=$DEST" >> "$CONFIG_FILE"
+
+    FOLDER_NAME=$(basename "$SOURCE")
+
+    CONFIRM=$(osascript -e "button returned of (display dialog \"Ready to sync:
 
 Folder:      $FOLDER_NAME
 Destination: $DEST
 
 New and updated files only. Unchanged files skipped.\" buttons {\"Cancel\", \"Sync\"} default button \"Sync\")" 2>/dev/null)
 
-if [ "$CONFIRM" != "Sync" ]; then
-    exit 0
+    if [ "$CONFIRM" != "Sync" ]; then exit 0; fi
 fi
 
-# ── Step 4: Count total files ──
+FOLDER_NAME=$(basename "$SOURCE")
+
+# ── Count total files ──
 TOTAL_FILES=$(find "$SOURCE" -type f | wc -l | tr -d ' ')
 
 if [ "$TOTAL_FILES" -eq 0 ]; then
@@ -50,12 +89,11 @@ if [ "$TOTAL_FILES" -eq 0 ]; then
     exit 0
 fi
 
-# ── Step 5: Run rsync with progress tracking ──
+# ── Run rsync with progress tracking ──
 ERRFILE=$(mktemp)
 trap 'rm -f "$ERRFILE"' EXIT
 
 DEST_FOLDER="$DEST/$(basename "$SOURCE")"
-
 HALFWAY=$((TOTAL_FILES / 2))
 HALFWAY_NOTIFIED=0
 
@@ -81,15 +119,15 @@ if [ "$RSYNC_EXIT" -ne 0 ]; then
     exit 1
 fi
 
-# ── Step 6: Flush write buffers ──
+# ── Flush write buffers ──
 sync
 
-# ── Step 7: Verify ──
+# ── Verify ──
 VERIFY_OUTPUT=$(rsync -a --dry-run --itemize-changes --modify-window=2 "$SOURCE/" "$DEST_FOLDER/" 2>&1)
 MISMATCHES=$(echo "$VERIFY_OUTPUT" | grep -cE '^>f|^<f')
 DEST_COUNT=$(find "$DEST_FOLDER" -type f | wc -l | tr -d ' ')
 
-# ── Step 8: Show result ──
+# ── Show result ──
 if [ "$MISMATCHES" -gt 0 ]; then
     osascript -e "display alert \"⚠️ Verification Failed\" message \"$MISMATCHES file(s) don't match the source. Try running again.\""
 else
