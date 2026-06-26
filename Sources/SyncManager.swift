@@ -186,7 +186,7 @@ class SyncManager {
             }
 
             totalDone += countFiles(at: destFolder)
-            delegate?.syncDidProgress(done: totalDone, total: totalFiles)
+            delegate?.syncDidProgress(done: totalDone, total: totalFiles, currentFolder: folderName)
         }
 
         // Flush
