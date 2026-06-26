@@ -13,7 +13,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var changeFoldersMenuItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        UNUserNotificationCenter.current().delegate = self
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            if !granted {
+                print("Notification permission denied")
+            }
+        }
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         setIcon(.idle)
@@ -137,6 +142,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(req)
+    }
+}
+
+// MARK: - UNUserNotificationCenterDelegate
+
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification,
+                                withCompletionHandler handler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        handler([.banner, .sound])
     }
 }
 

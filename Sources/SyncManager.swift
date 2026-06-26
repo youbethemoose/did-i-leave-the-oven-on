@@ -31,7 +31,7 @@ class SyncManager {
     // MARK: - Config
 
     func loadConfig() {
-        guard let content = try? String(contentsOf: configURL) else { return }
+        guard let content = try? String(contentsOf: configURL, encoding: .utf8) else { return }
         sources = []
         destination = nil
         for line in content.components(separatedBy: "\n") {
@@ -55,7 +55,6 @@ class SyncManager {
     func pickFolders(completion: @escaping () -> Void) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-
             self.sources = []
             self.pickNextSource {
                 let destPanel = NSOpenPanel()
@@ -129,29 +128,8 @@ class SyncManager {
         }
     }
 
-    private func runRsync(source: String, destination: String) -> Bool {
-        let p = Process()
-        p.launchPath = "/usr/bin/rsync"
-        p.arguments = ["-a", "--update", "--modify-window=2", source, destination]
-        try? p.run()
-        p.waitUntilExit()
-        return p.terminationStatus == 0
-    }
-
-    private func verifyRsync(source: String, destFolder: String) -> Int {
-        let p = Process()
-        p.launchPath = "/usr/bin/rsync"
-        p.arguments = ["-a", "--dry-run", "--itemize-changes", "--modify-window=2",
-                       source + "/", destFolder + "/"]
-        let pipe = Pipe()
-        p.standardOutput = pipe
-        try? p.run()
-        p.waitUntilExit()
-        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-        return output.components(separatedBy: "\n").filter { $0.hasPrefix(">f") || $0.hasPrefix("<f") }.count
-    }
-
     private func runSync(destination: String) {
+        // Count total files across all sources
         let totalFiles = sources.reduce(0) { $0 + countFiles(at: $1) }
         guard totalFiles > 0 else {
             finish(success: false, folder: "source folders", destination: destination)
@@ -166,22 +144,36 @@ class SyncManager {
             let folderName = URL(fileURLWithPath: src).lastPathComponent
             let destFolder = (destination as NSString).appendingPathComponent(folderName)
 
-            guard runRsync(source: src, destination: destination) else {
+            // Start rsync in background so we can monitor progress while it runs
+            let rsync = Process()
+            rsync.launchPath = "/usr/bin/rsync"
+            rsync.arguments = ["-a", "--update", "--modify-window=2", src, destination]
+            do { try rsync.run() } catch {
                 finish(success: false, folder: folderName, destination: destination)
                 return
             }
 
-            // Monitor progress after rsync (for small syncs it finishes fast; this catches large ones)
-            if !halfwayNotified {
-                let done = totalDone + countFiles(at: destFolder)
-                delegate?.syncDidProgress(done: done, total: totalFiles)
-                if done >= halfway {
-                    halfwayNotified = true
-                    delegate?.syncDidReachHalfway()
+            // Monitor every 3 seconds while rsync is running
+            while rsync.isRunning {
+                Thread.sleep(forTimeInterval: 3)
+                if !halfwayNotified {
+                    let done = totalDone + countFiles(at: destFolder)
+                    delegate?.syncDidProgress(done: done, total: totalFiles)
+                    if done >= halfway {
+                        halfwayNotified = true
+                        delegate?.syncDidReachHalfway()
+                    }
                 }
             }
 
+            rsync.waitUntilExit()
+            guard rsync.terminationStatus == 0 else {
+                finish(success: false, folder: folderName, destination: destination)
+                return
+            }
+
             totalDone += countFiles(at: destFolder)
+            delegate?.syncDidProgress(done: totalDone, total: totalFiles)
         }
 
         // Flush
@@ -190,13 +182,26 @@ class SyncManager {
         try? sync.run()
         sync.waitUntilExit()
 
-        // Verify
+        // Verify all folders
         var totalMismatches = 0
         var totalDestCount = 0
         for src in sources {
             let folderName = URL(fileURLWithPath: src).lastPathComponent
             let destFolder = (destination as NSString).appendingPathComponent(folderName)
-            totalMismatches += verifyRsync(source: src, destFolder: destFolder)
+
+            let verify = Process()
+            verify.launchPath = "/usr/bin/rsync"
+            verify.arguments = ["-a", "--dry-run", "--itemize-changes", "--modify-window=2",
+                                src + "/", destFolder + "/"]
+            let pipe = Pipe()
+            verify.standardOutput = pipe
+            try? verify.run()
+            verify.waitUntilExit()
+
+            let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            totalMismatches += output.components(separatedBy: "\n").filter {
+                $0.hasPrefix(">f") || $0.hasPrefix("<f")
+            }.count
             totalDestCount += countFiles(at: destFolder)
         }
 
