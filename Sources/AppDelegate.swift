@@ -163,13 +163,22 @@ extension AppDelegate: SyncManagerDelegate {
         updateMenu()
     }
 
-    func syncDidProgress(done: Int, total: Int) {
+    func syncDidProgress(done: Int, total: Int, currentFolder: String = "") {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             let pct = total > 0 ? (done * 100 / total) : 0
-            self.progressMenuItem.title = "  \(done) of \(total) files (\(pct)%)"
+            let bar = Self.progressBar(pct: pct)
+            var line = "  \(bar)  \(done) of \(total) files (\(pct)%)"
+            if !currentFolder.isEmpty { line += "\n  Syncing: \(currentFolder)" }
+            self.progressMenuItem.title = line
             self.progressMenuItem.isHidden = false
+            self.statusItem.button?.title = " \(pct)%"
         }
+    }
+
+    static func progressBar(pct: Int) -> String {
+        let filled = pct / 10
+        return String(repeating: "█", count: filled) + String(repeating: "░", count: 10 - filled)
     }
 
     func syncDidReachHalfway() {
@@ -181,6 +190,7 @@ extension AppDelegate: SyncManagerDelegate {
             guard let self = self else { return }
             self.setIcon(.done)
             self.progressMenuItem.isHidden = true
+            self.statusItem.button?.title = ""
         }
         updateMenu()
         let destName = URL(fileURLWithPath: destination).lastPathComponent
@@ -200,6 +210,7 @@ extension AppDelegate: SyncManagerDelegate {
             guard let self = self else { return }
             self.setIcon(.error)
             self.progressMenuItem.isHidden = true
+            self.statusItem.button?.title = ""
         }
         updateMenu()
         notify(title: "⚠️ Sync Failed", body: "Error syncing \(folder). Check source and destination.")

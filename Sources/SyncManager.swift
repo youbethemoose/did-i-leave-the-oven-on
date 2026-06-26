@@ -3,7 +3,7 @@ import AppKit
 
 protocol SyncManagerDelegate: AnyObject {
     func syncDidStart()
-    func syncDidProgress(done: Int, total: Int)
+    func syncDidProgress(done: Int, total: Int, currentFolder: String)
     func syncDidReachHalfway()
     func syncDidComplete(fileCount: Int, destination: String)
     func syncDidFail(folder: String)
@@ -65,7 +65,22 @@ class SyncManager {
                 guard destPanel.runModal() == .OK, let destURL = destPanel.url else { return }
                 self.destination = destURL.path
                 self.saveConfig()
-                completion()
+
+                // Count files and show confirmation before syncing
+                let total = self.sources.reduce(0) { $0 + self.countFiles(at: $1) }
+                let folderLines = self.sources.map { "• " + URL(fileURLWithPath: $0).lastPathComponent }.joined(separator: "\n")
+                let destName = destURL.lastPathComponent
+
+                let alert = NSAlert()
+                alert.messageText = "Ready to sync?"
+                alert.informativeText = "\(folderLines)\n\n→ \(destName)\n\n\(total) files total. Only new and changed files will be copied."
+                alert.addButton(withTitle: "Sync Now")
+                alert.addButton(withTitle: "Cancel")
+                NSApp.activate(ignoringOtherApps: true)
+
+                if alert.runModal() == .alertFirstButtonReturn {
+                    completion()
+                }
             }
         }
     }
@@ -156,13 +171,11 @@ class SyncManager {
             // Monitor every 3 seconds while rsync is running
             while rsync.isRunning {
                 Thread.sleep(forTimeInterval: 3)
-                if !halfwayNotified {
-                    let done = totalDone + countFiles(at: destFolder)
-                    delegate?.syncDidProgress(done: done, total: totalFiles)
-                    if done >= halfway {
-                        halfwayNotified = true
-                        delegate?.syncDidReachHalfway()
-                    }
+                let done = totalDone + countFiles(at: destFolder)
+                delegate?.syncDidProgress(done: done, total: totalFiles, currentFolder: folderName)
+                if !halfwayNotified && done >= halfway {
+                    halfwayNotified = true
+                    delegate?.syncDidReachHalfway()
                 }
             }
 
