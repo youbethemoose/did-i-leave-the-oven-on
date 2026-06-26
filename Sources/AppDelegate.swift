@@ -127,6 +127,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard !syncManager.isSyncing else { return }
         syncManager.pickFolders { [weak self] in
             self?.updateMenu()
+            self?.syncManager.startSync()
         }
     }
 
