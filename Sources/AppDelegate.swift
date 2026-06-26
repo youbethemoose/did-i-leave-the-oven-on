@@ -172,7 +172,12 @@ extension AppDelegate: SyncManagerDelegate {
             if !currentFolder.isEmpty { line += "\n  Syncing: \(currentFolder)" }
             self.progressMenuItem.title = line
             self.progressMenuItem.isHidden = false
-            self.statusItem.button?.title = " \(pct)%"
+
+            // Show percentage as text in menu bar
+            if let button = self.statusItem.button {
+                button.image = nil
+                button.title = "⏳ \(pct)%"
+            }
         }
     }
 
