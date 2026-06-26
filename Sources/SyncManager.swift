@@ -56,16 +56,18 @@ class SyncManager {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
 
-            let destPanel = NSOpenPanel()
-            destPanel.message = "Select the destination drive or folder:"
-            destPanel.canChooseFiles = false
-            destPanel.canChooseDirectories = true
-            NSApp.activate(ignoringOtherApps: true)
-            guard destPanel.runModal() == .OK, let destURL = destPanel.url else { return }
-            self.destination = destURL.path
-
             self.sources = []
-            self.pickNextSource(completion: completion)
+            self.pickNextSource {
+                let destPanel = NSOpenPanel()
+                destPanel.message = "Select the destination drive or folder:"
+                destPanel.canChooseFiles = false
+                destPanel.canChooseDirectories = true
+                NSApp.activate(ignoringOtherApps: true)
+                guard destPanel.runModal() == .OK, let destURL = destPanel.url else { return }
+                self.destination = destURL.path
+                self.saveConfig()
+                completion()
+            }
         }
     }
 
@@ -78,7 +80,6 @@ class SyncManager {
 
         guard panel.runModal() == .OK, let url = panel.url else {
             if sources.isEmpty { return }
-            saveConfig()
             completion()
             return
         }
@@ -93,7 +94,6 @@ class SyncManager {
         if alert.runModal() == .alertFirstButtonReturn {
             pickNextSource(completion: completion)
         } else {
-            saveConfig()
             completion()
         }
     }
